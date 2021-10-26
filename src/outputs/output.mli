@@ -29,7 +29,6 @@ class virtual output :
   content_kind:Kind.t
   -> output_kind:string
   -> ?name:string
-  -> infallible:bool
   -> on_start:(unit -> unit)
   -> on_stop:(unit -> unit)
   -> Lang.value
@@ -39,7 +38,7 @@ class virtual output :
        method stype : [ `Fallible | `Infallible ]
        method self_sync : Source.self_sync
        method remaining : int
-       method output : unit
+       method private get_frame_ready : bool
        method private get_frame : Frame.t -> unit
        method abort_track : unit
        method is_ready : bool
@@ -47,10 +46,12 @@ class virtual output :
        method transition_to : Start_stop.state -> unit
        method private add_metadata : Request.metadata -> unit
        method private metadata_queue : Request.metadata Queue.t
-       method private reset : unit
-       method virtual private send_frame : Frame.t -> unit
-       method virtual private start : unit
-       method virtual private stop : unit
+       method reset : unit
+       method virtual private send_frame : Frame.t -> int -> unit
+       method on_start : (unit -> unit) -> unit
+       method private start : unit
+       method on_stop : (unit -> unit) -> unit
+       method private stop : unit
      end
 
 (** Default methods on output values. *)
@@ -60,36 +61,28 @@ class virtual encoded :
   content_kind:Kind.t
   -> output_kind:string
   -> name:string
-  -> infallible:bool
   -> on_start:(unit -> unit)
   -> on_stop:(unit -> unit)
   -> autostart:bool
   -> Lang.value
   -> object
        inherit output
-       method private send_frame : Frame.t -> unit
+       method private send_frame : Frame.t -> int -> unit
        method virtual private encode : Frame.t -> int -> int -> 'a
 
        method virtual private insert_metadata :
          Meta_format.export_metadata -> unit
 
        method virtual private send : 'a -> unit
-       method private reset : unit
-       method virtual private start : unit
-       method virtual private stop : unit
      end
 
 class dummy :
-  infallible:bool
-  -> on_start:(unit -> unit)
+  on_start:(unit -> unit)
   -> on_stop:(unit -> unit)
   -> autostart:bool
   -> kind:Kind.t
   -> Lang.value
   -> object
        inherit output
-       method private reset : unit
-       method private start : unit
-       method private stop : unit
-       method private send_frame : Frame.t -> unit
+       method private send_frame : Frame.t -> int -> unit
      end

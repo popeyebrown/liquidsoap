@@ -27,7 +27,7 @@ class virtual ['a] base ~nb_blocks =
     if nb_blocks < 1 then
       failwith "Buffered I/O requires a non-zero buffer length."
   in
-  object
+  object (self)
     val mutable buffer = None
 
     method buffer =
@@ -70,8 +70,17 @@ class virtual ['a] base ~nb_blocks =
      *   `Crashed when process has crashed.
      *   `Tired while shutting down. *)
     val mutable io_state = `Idle
+    method virtual id : string
+    method virtual private start_ioring_thread : unit
 
-    method sourcering_stop =
+    method ioring_start =
+      assert (io_state = `Idle);
+      read <- 0;
+      write <- 0;
+      io_state <-
+        `Running (Tutils.create (fun () -> self#start_ioring_thread) () self#id)
+
+    method ioring_stop =
       match io_state with
         | `Running id ->
             Mutex.lock wait_m;
@@ -92,18 +101,14 @@ class virtual ['a] input ~nb_blocks =
   object (self)
     inherit ['a] base ~nb_blocks
     method virtual pull_block : 'a -> unit
-    method virtual id : string
-    method virtual close : unit
-    method private sleep = self#sourcering_stop
-    method private stop = self#sourcering_stop
+    method virtual on_initialize : (unit -> unit) -> unit
+    method virtual on_shutdown : (unit -> unit) -> unit
 
-    method private start =
-      assert (io_state = `Idle);
-      read <- 0;
-      write <- 0;
-      io_state <- `Running (Tutils.create (fun _ -> self#writer) () self#id)
+    initializer
+    self#on_initialize (fun () -> self#ioring_start);
+    self#on_shutdown (fun () -> self#ioring_stop)
 
-    method private writer =
+    method private start_ioring_thread =
       try
         while true do
           (* Wait for the reader to read the block we fancy, or for shutdown. *)
@@ -126,14 +131,8 @@ class virtual ['a] input ~nb_blocks =
           Condition.signal wait_c
         done
       with
-        | Exit -> self#close
+        | Exit -> ()
         | e ->
-            (* We crashed. Let's attempt to leave things in a decent state.
-             * Note that the exception should only come from #pull_lock,
-             * which is performed outside of critical section, so there's
-             * not need to unlock. *)
-            self#close;
-
             (* It is possible that the reader is waiting for us,
              * hence blocking the streaming thread, and consequently
              * the possibility of going to sleep peacefully.
@@ -146,7 +145,7 @@ class virtual ['a] input ~nb_blocks =
             raise e
 
     (* This is meant to be called from #get_frame,
-     * so it makes sense to require that #sleep hasn't been called
+     * so it makes sense to require that #shutdown hasn't been called
      * and won't be called before #get_block returns. *)
     method private get_block =
       assert (match io_state with `Running _ | `Crashed -> true | _ -> false);
@@ -161,21 +160,20 @@ class virtual ['a] input ~nb_blocks =
       b
   end
 
+(* Output require start/stop classes so we're providing them through
+   [base] here. *)
 class virtual ['a] output ~nb_blocks =
   object (self)
     inherit ['a] base ~nb_blocks
-    method virtual id : string
     method virtual push_block : 'a -> unit
-    method virtual close : unit
-    method stop = self#sourcering_stop
+    method virtual on_start : (unit -> unit) -> unit
+    method virtual on_stop : (unit -> unit) -> unit
 
-    method start =
-      assert (io_state = `Idle);
-      read <- 0;
-      write <- 0;
-      io_state <- `Running (Tutils.create (fun () -> self#reader) () self#id)
+    initializer
+    self#on_start (fun () -> self#ioring_start);
+    self#on_stop (fun () -> self#ioring_stop)
 
-    method reader =
+    method start_ioring_thread =
       try
         while true do
           (* Wait for the writer to emit the block we fancy, or for shutdown. *)
@@ -195,14 +193,8 @@ class virtual ['a] output ~nb_blocks =
           Condition.signal wait_c
         done
       with
-        | Exit -> self#close
+        | Exit -> ()
         | e ->
-            (* We crashed. Let's attempt to leave things in a decent state.
-             * Note that the exception should only come from #pull_lock,
-             * which is performed outside of critical section, so there's
-             * not need to unlock. *)
-            self#close;
-
             (* It is possible that the reader is waiting for us,
              * hence blocking the streaming thread, and consequently
              * the possibility of going to sleep peacefully.

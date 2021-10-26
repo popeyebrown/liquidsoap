@@ -128,9 +128,9 @@ class pipe ~kind ~replay_delay ~data_len ~process ~bufferize ~log_overfull ~max
           | -1, _ -> ()
           | _, `Break_and_metadata m ->
               Generator.add_metadata abg m;
-              Generator.add_break abg
+              Generator.add_track_mark abg
           | _, `Metadata m -> Generator.add_metadata abg m
-          | _, `Break -> Generator.add_break abg
+          | _, `Break -> Generator.add_track_mark abg
           | _ -> ()
         end;
         if abg_max_len < buffered + len then
@@ -237,13 +237,13 @@ class pipe ~kind ~replay_delay ~data_len ~process ~bufferize ~log_overfull ~max
             | _, `Sleep -> false
             | _, `Break_and_metadata m ->
                 Generator.add_metadata abg m;
-                Generator.add_break abg;
+                Generator.add_track_mark abg;
                 true
             | _, `Metadata m ->
                 Generator.add_metadata abg m;
                 true
             | _, `Break ->
-                Generator.add_break abg;
+                Generator.add_track_mark abg;
                 true
             | _, `Nothing -> restart)
 

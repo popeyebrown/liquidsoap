@@ -78,3 +78,13 @@ let error ?bt ?(pos = []) ?(message = "") kind =
   match bt with
     | None -> raise e
     | Some bt -> Printexc.raise_with_backtrace e bt
+
+let raise_as_runtime ~bt ~kind exn =
+  match exn with
+    | Runtime_error _ -> Printexc.raise_with_backtrace exn bt
+    | exn ->
+        error ~bt
+          ~message:
+            (Printf.sprintf "%s\nBacktrace:\n%s" (Printexc.to_string exn)
+               (Printexc.raw_backtrace_to_string bt))
+          kind

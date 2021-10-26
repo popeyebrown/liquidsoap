@@ -168,7 +168,7 @@ class frei0r_source ~kind ~name bgra instance params =
     method private get_frame frame =
       if must_fail then (
         must_fail <- false;
-        VFrame.add_break frame (VFrame.position frame))
+        VFrame.add_track_mark frame (VFrame.position frame))
       else (
         params ();
         let start = VFrame.position frame in
@@ -184,7 +184,7 @@ class frei0r_source ~kind ~name bgra instance params =
           Video.set rgb i img;
           t <- t +. dt
         done;
-        VFrame.add_break frame stop)
+        VFrame.add_track_mark frame stop)
   end
 
 (** Make a list of parameters. *)

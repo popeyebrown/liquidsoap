@@ -161,6 +161,7 @@ val add_operator :
   descr:string ->
   ?flags:Documentation.flag list ->
   ?meth:(< Source.source ; .. > as 'a) operator_method list ->
+  ?clock:Clock.t ->
   string ->
   proto ->
   return_t:t ->

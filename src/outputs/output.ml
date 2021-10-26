@@ -25,7 +25,7 @@
 open Source
 
 let proto =
-  Start_stop.output_proto
+  Start_stop.proto
   @ [
       ( "fallible",
         Lang.bool_t,
@@ -41,23 +41,25 @@ let meth = Start_stop.meth ()
   * Takes care of pulling the data out of the source, type checkings,
   * maintains a queue of last ten metadata and setups standard Server commands,
   * including start/stop. *)
-class virtual output ~content_kind ~output_kind ?(name = "") ~infallible
+class virtual output ~content_kind ~output_kind ?(name = "")
   ~(on_start : unit -> unit) ~(on_stop : unit -> unit) val_source autostart =
   let source = Lang.to_source val_source in
   object (self)
-    initializer
-    (* This should be done before the active_operator initializer
-     * attaches us to a clock. *)
-    if infallible && source#stype <> `Infallible then
-      raise (Error.Invalid_value (val_source, "That source is fallible"))
-
-    inherit active_operator ~name:output_kind content_kind [source] as super
-    inherit Start_stop.base ~on_start ~on_stop as start_stop
-    method virtual private start : unit
-    method virtual private stop : unit
-    method virtual private send_frame : Frame.t -> unit
+    inherit active_operator ~name:output_kind content_kind [source]
+    inherit Start_stop.base ~on_start ~on_stop ~autostart () as start_stop
+    method virtual private send_frame : Frame.t -> int -> unit
     method self_sync = source#self_sync
-    method stype = if infallible then `Infallible else `Fallible
+    val mutable on_start = [on_start]
+    method on_start = self#mutexify (fun fn -> on_start <- fn :: on_start)
+
+    method private start =
+      List.iter (fun fn -> fn ()) (self#mutexify (fun () -> on_start) ())
+
+    val mutable on_stop = [on_stop]
+    method on_stop = self#mutexify (fun fn -> on_stop <- fn :: on_stop)
+
+    method private stop =
+      List.iter (fun fn -> fn ()) (self#mutexify (fun () -> on_stop) ())
 
     (* Registration of Telnet commands must be delayed because some operators
        change their id at initialization time. *)
@@ -95,44 +97,19 @@ class virtual output ~content_kind ~output_kind ?(name = "") ~infallible
               let t = Frame.seconds_of_main r in
               Printf.sprintf "%.2f" t)))
 
-    method is_ready =
-      if infallible then (
-        assert source#is_ready;
-        true)
-      else source#is_ready
-
     method remaining = source#remaining
     method abort_track = source#abort_track
     method seek len = source#seek len
 
     (* Operator startup *)
-    method private wake_up activation =
-      (* We prefer [name] as an ID over the default,
-       * but do not overwrite user-defined ID.
-       * Our ID will be used for the server interface. *)
-      if name <> "" then self#set_id ~definitive:false name;
+    initializer
+    self#on_initialize (fun () ->
+        (* We prefer [name] as an ID over the default,
+         * but do not overwrite user-defined ID.
+         * Our ID will be used for the server interface. *)
+        if name <> "" then self#set_id ~definitive:false name;
 
-      self#log#debug "Clock is %s."
-        (Source.Clock_variables.to_string self#clock);
-      self#log#info "Content type is %s."
-        (Frame.string_of_content_type self#ctype);
-
-      (* Get our source ready.
-       * This can take a while (preparing playlists, etc). *)
-      source#get_ready ((self :> operator) :: activation);
-      if infallible then
-        while not source#is_ready do
-          self#log#important "Waiting for %S to be ready..." source#id;
-          Thread.delay 1.
-        done;
-
-      start_stop#transition_to (if autostart then `Started else `Stopped);
-
-      self#register_telnet
-
-    method private sleep =
-      start_stop#transition_to `Stopped;
-      source#leave (self :> operator)
+        self#register_telnet)
 
     (* Metadata stuff: keep track of what was streamed. *)
     val q_length = 10
@@ -143,57 +120,41 @@ class virtual output ~content_kind ~output_kind ?(name = "") ~infallible
       if Queue.length metadata_q > q_length then ignore (Queue.take metadata_q)
 
     method private metadata_queue = Queue.copy metadata_q
-
-    (* The output process *)
     val mutable skip = false
-    method private skip = skip <- true
-    method private get_frame buf = source#get buf
+    method private skip = self#mutexify (fun () -> skip <- true) ()
 
-    method private output =
-      if self#is_ready && state <> `Stopped then
+    initializer
+    self#on_before_get_frame (fun _ -> source#generate_data);
+    self#on_before_streaming_cycle_end (fun generated ->
+        (* Output the source's frame if it has some data *)
+        if generated > 0 then self#send_frame source#frame generated);
+    self#on_after_streaming_cycle_end (fun _ ->
+        (* Perform skip if needed *)
+        if skip then (
+          self#log#important "Performing user-requested skip";
+          skip <- false;
+          self#abort_track))
+
+    method private get_frame_ready =
+      if source#get_frame_ready && state <> `Stopped then
         start_stop#transition_to `Started;
-      if start_stop#state = `Started then (
-        (* Complete filling of the frame *)
-        let get_count = ref 0 in
-        while Frame.is_partial self#memo && self#is_ready do
-          incr get_count;
-          if !get_count > Lazy.force Frame.size then
-            self#log#severe
-              "Warning: there may be an infinite sequence of empty tracks!";
-          source#get self#memo
-        done;
-        List.iter
-          (fun (_, m) -> self#add_metadata m)
-          (Frame.get_all_metadata self#memo);
+      source#get_frame_ready && state = `Started
 
-        (* Output that frame if it has some data *)
-        if Frame.position self#memo > 0 then self#send_frame self#memo;
-        if Frame.is_partial self#memo then (
-          self#log#important "Source failed (no more tracks) stopping output...";
-          self#transition_to `Idle))
-
-    method after_output =
-      (* Let [memo] be cleared and signal propagated *)
-      super#after_output;
-
-      (* Perform skip if needed *)
-      if skip then (
-        self#log#important "Performing user-requested skip";
-        skip <- false;
-        self#abort_track)
+    method private get_frame frame =
+      Frame.blit source#frame 0 frame 0 (Frame.position source#frame);
+      List.iter
+        (fun (_, m) -> self#add_metadata m)
+        (Frame.get_all_metadata frame)
   end
 
-class dummy ~infallible ~on_start ~on_stop ~autostart ~kind source =
+class dummy ~on_start ~on_stop ~autostart ~kind source =
   object
     inherit
       output
-        source autostart ~name:"dummy" ~output_kind:"output.dummy" ~infallible
-          ~on_start ~on_stop ~content_kind:kind
+        source autostart ~name:"dummy" ~output_kind:"output.dummy" ~on_start
+          ~on_stop ~content_kind:kind
 
-    method private reset = ()
-    method private start = ()
-    method private stop = ()
-    method private send_frame _ = ()
+    method private send_frame _ _ = ()
   end
 
 let () =
@@ -204,31 +165,28 @@ let () =
     ~category:`Output ~descr:"Dummy output for debugging purposes." ~meth
     ~return_t
     (fun p ->
-      let infallible = not (Lang.to_bool (List.assoc "fallible" p)) in
       let autostart = Lang.to_bool (List.assoc "start" p) in
       let on_start = List.assoc "on_start" p in
       let on_stop = List.assoc "on_stop" p in
       let on_start () = ignore (Lang.apply on_start []) in
       let on_stop () = ignore (Lang.apply on_stop []) in
       let kind = Kind.of_kind kind in
-      new dummy
-        ~kind ~on_start ~on_stop ~infallible ~autostart (List.assoc "" p))
+      new dummy ~kind ~on_start ~on_stop ~autostart (List.assoc "" p))
 
 (** More concrete abstract-class, which takes care of the #send_frame
   * method for outputs based on encoders. *)
-class virtual encoded ~content_kind ~output_kind ~name ~infallible ~on_start
-  ~on_stop ~autostart source =
+class virtual encoded ~content_kind ~output_kind ~name ~on_start ~on_stop
+  ~autostart source =
   object (self)
     inherit
       output
-        ~infallible ~on_start ~on_stop ~content_kind ~output_kind ~name source
-          autostart
+        ~on_start ~on_stop ~content_kind ~output_kind ~name source autostart
 
     method virtual private insert_metadata : Meta_format.export_metadata -> unit
     method virtual private encode : Frame.t -> int -> int -> 'a
     method virtual private send : 'a -> unit
 
-    method private send_frame frame =
+    method private send_frame frame length =
       let rec output_chunks frame =
         let f start stop =
           begin
@@ -241,14 +199,14 @@ class virtual encoded ~content_kind ~output_kind ~name ~infallible ~on_start
         in
         function
         | [] -> assert false
-        | [i] -> assert (i = Lazy.force Frame.size || not infallible)
+        | [i] -> assert (i = length)
         | start :: stop :: l ->
-            if start < stop then f start stop else assert (start = stop);
+            f start stop;
             output_chunks frame (stop :: l)
       in
       output_chunks frame
-        (0
-        :: List.sort compare
-             (List.map fst (Frame.get_all_metadata frame) @ Frame.breaks frame)
-        )
+        (List.sort_uniq compare
+           (List.map fst (Frame.get_all_metadata frame)
+           @ Frame.track_marks frame)
+        @ [0; length])
   end

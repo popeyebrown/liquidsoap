@@ -30,32 +30,31 @@ class virtual source ?name ~seek kind duration =
     inherit Source.source ?name kind
     method stype = if track_size = None then `Infallible else `Fallible
     val mutable remaining = track_size
-    method is_ready = remaining <> Some 0
+    method get_frame_ready = remaining <> Some 0
     method seek x = if seek then x else 0
     method self_sync = (`Static, false)
 
     method remaining =
       match remaining with None -> -1 | Some remaining -> remaining
 
-    val mutable must_fail = false
-    method abort_track = must_fail <- true
-    method virtual private synthesize : Frame.t -> int -> int -> unit
+    val mutable add_track_mark = false
+    method abort_track = self#mutexify (fun () -> add_track_mark <- true) ()
+    method virtual private synthesize : length:int -> Frame.t -> unit
+    method reset = ()
 
-    method private get_frame frame =
-      if must_fail then (
-        Frame.add_break frame (Frame.position frame);
-        must_fail <- false;
-        if track_size <> None then remaining <- Some 0)
-      else (
-        let off = Frame.position frame in
-        let len =
-          match remaining with
-            | None -> Lazy.force Frame.size - off
-            | Some r ->
-                let len = min (Lazy.force Frame.size - off) r in
-                remaining <- Some (r - len);
-                len
-        in
-        self#synthesize frame off len;
-        Frame.add_break frame (off + len))
+    method private get_frame ~length frame =
+      let len =
+        match remaining with
+          | None -> Lazy.force Frame.size
+          | Some r ->
+              let len = min (Lazy.force Frame.size) r in
+              remaining <- Some (r - len);
+              len
+      in
+      self#synthesize ~length frame;
+      match (add_track_mark, remaining) with
+        | true, _ | _, Some 0 ->
+            Frame.add_track_mark frame len;
+            add_track_mark <- false
+        | _, _ -> ()
   end

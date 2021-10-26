@@ -251,3 +251,22 @@ module RuntimeType = MkAbstract (struct
 
   let compare = Stdlib.compare
 end)
+
+module ClockValue = MkAbstract (struct
+  type content = Clock.t
+
+  let name = "clock"
+  let descr c = Printf.sprintf "clock<id=%s>" (Utils.quote_string c#id)
+
+  let to_json _ =
+    raise
+      Runtime_error.(
+        Runtime_error
+          {
+            kind = "json";
+            msg = "Clocks cannot be represented as json";
+            pos = [];
+          })
+
+  let compare = Stdlib.compare
+end)

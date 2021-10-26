@@ -77,7 +77,7 @@ class producer ~check_self_sync ~consumers_val ~name ~kind g =
       child_support#after_output
 
     method abort_track =
-      Generator.add_break g;
+      Generator.add_track_mark g;
       List.iter (fun c -> c#abort_track) consumers
   end
 

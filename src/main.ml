@@ -450,7 +450,7 @@ let () =
 let initial_cleanup () =
   if !Term.profile then
     log#important "Profiler stats:\n\n%s" (Profiler.stats ());
-  Clock.stop ();
+  Clock.main#stop;
   if Tutils.has_started () then (
     log#important "Waiting for main threads to terminate...";
     Tutils.join_all ();
@@ -530,7 +530,9 @@ let () =
         (* TODO if start fails (e.g. invalid password or mountpoint) it
          *   raises an exception and dtools catches it so we don't get
          *   a backtrace (by default at least). *)
-        Clock.start ();
+        (*
+        Clock.main#start;
+*)
         Tutils.start ();
         Tutils.main ()
       in
@@ -540,7 +542,7 @@ let () =
           check_directories ();
           ignore (Thread.create Runtime.interactive ());
           Dtools.Init.init main)
-        else if Source.has_outputs () || force_start#get then (
+        else if true then (
           check_directories ();
           let msg_of_err = function
             | `User -> "root euid (user)"

@@ -268,7 +268,7 @@ module AdaptativeBuffer = struct
             let buf = AFrame.pcm frame in
             let salen = scale alen in
             fill buf aofs alen salen;
-            Frame.add_break frame (ofs + len);
+            Frame.add_track_mark frame (ofs + len);
 
             (* self#log#debug "filled %d from %d (x %f)" len ofs scaling; *)
 

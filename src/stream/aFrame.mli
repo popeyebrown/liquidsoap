@@ -22,22 +22,16 @@ val size : unit -> int
 val position : t -> int
 
 (** Breaks in frame. *)
-val breaks : t -> int list
+val track_marks : t -> int list
 
-(** Add a break. *)
-val add_break : t -> int -> unit
+(** Add a track_mark. *)
+val add_track_mark : t -> int -> unit
 
-(** Change all the breaks. *)
-val set_breaks : t -> int list -> unit
+(** Change all the track_marks. *)
+val set_track_marks : t -> int list -> unit
 
-(** Is it partially filled ? *)
-val is_partial : t -> bool
-
-(** Reset breaks. *)
-val clear : t -> unit
-
-(** Reset breaks and metadata, but leaves the last metadata at position -1. *)
-val advance : t -> unit
+(** Advance frame by [len] audio ticks. *)
+val advance : len:int -> t -> unit
 
 (** {2 Metadatas handling} *)
 

@@ -25,17 +25,16 @@
 let () = Lang.apply_fun := Evaluation.apply
 
 let type_and_run ~throw ~lib ast =
-  Clock.collect_after (fun () ->
-      if Lazy.force Term.debug then Printf.eprintf "Type checking...\n%!";
-      (* Type checking *)
-      Typechecking.check ~throw ~ignored:true ast;
+  if Lazy.force Term.debug then Printf.eprintf "Type checking...\n%!";
+  (* Type checking *)
+  Typechecking.check ~throw ~ignored:true ast;
 
-      if Lazy.force Term.debug then
-        Printf.eprintf "Checking for unused variables...\n%!";
-      (* Check for unused variables, relies on types *)
-      Term.check_unused ~throw ~lib ast;
-      if Lazy.force Term.debug then Printf.eprintf "Evaluating...\n%!";
-      ignore (Evaluation.eval_toplevel ast))
+  if Lazy.force Term.debug then
+    Printf.eprintf "Checking for unused variables...\n%!";
+  (* Check for unused variables, relies on types *)
+  Term.check_unused ~throw ~lib ast;
+  if Lazy.force Term.debug then Printf.eprintf "Evaluating...\n%!";
+  ignore (Evaluation.eval_toplevel ast)
 
 (** {1 Error reporting} *)
 
@@ -247,9 +246,8 @@ let eval ~ignored ~ty s =
   let lexbuf = Sedlexing.Utf8.from_string s in
   let expr = mk_expr ~pwd:(Unix.getcwd ()) Parser.program lexbuf in
   let expr = Term.(make (Cast (expr, ty))) in
-  Clock.collect_after (fun () ->
-      report lexbuf (fun ~throw () -> Typechecking.check ~throw ~ignored expr);
-      Evaluation.eval expr)
+  report lexbuf (fun ~throw () -> Typechecking.check ~throw ~ignored expr);
+  Evaluation.eval expr
 
 let from_in_channel ?parse_only ~lib x =
   from_in_channel ?parse_only ~ns:None ~lib x
@@ -300,8 +298,7 @@ let interactive () =
             in
             Typechecking.check ~throw ~ignored:false expr;
             Term.check_unused ~throw ~lib:true expr;
-            Clock.collect_after (fun () ->
-                ignore (Evaluation.eval_toplevel ~interactive:true expr)));
+            ignore (Evaluation.eval_toplevel ~interactive:true expr));
         true
       with
         | End_of_file ->

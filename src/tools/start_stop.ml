@@ -29,15 +29,23 @@
    restart. *)
 type state = [ `Started | `Stopped | `Idle ]
 
-(** Base class for sources with start/stop methods. Class ineheriting it should
-    declare their own [start]/[stop] method and users should call [#set_start]  *)
-class virtual base ~(on_start : unit -> unit) ~(on_stop : unit -> unit) =
+(** Class for sources with start/stop methods. Class inheriting it should
+    declare their own [start]/[stop] method. *)
+class virtual base ~(on_start : unit -> unit) ~(on_stop : unit -> unit)
+  ~autostart () =
   object (self)
-    val mutable state : state = `Idle
-    method state = state
+    (* Source methods. *)
+    method virtual private mutexify : 'a 'b. ('a -> 'b) -> 'a -> 'b
+    method virtual on_initialize : (unit -> unit) -> unit
+    method virtual on_shutdown : (unit -> unit) -> unit
+    method virtual on_streaming_cycle_start : (int -> unit) -> unit
+
+    (* Method that should be implemented by inheriting classes. *)
     method virtual private start : unit
     method virtual private stop : unit
-    method virtual stype : [ `Fallible | `Infallible ]
+    val mutable state : state = `Idle
+    method state = self#mutexify (fun () -> state) ()
+    method stype : Source.source_t = `Fallible
 
     (* Default [reset] method. Can be overriden if necessary. *)
     method reset =
@@ -62,45 +70,17 @@ class virtual base ~(on_start : unit -> unit) ~(on_stop : unit -> unit) =
             on_stop ();
             state <- `Idle
         | `Idle, `Stopped | `Idle, `Idle -> ()
+
+    val mutable is_ready = false
+    method is_ready = self#mutexify (fun () -> is_ready) ()
+
+    initializer
+    self#on_initialize (fun () -> if autostart then self#transition_to `Started);
+    self#on_shutdown (fun () -> self#transition_to `Stopped);
+    self#on_streaming_cycle_start (fun _ -> is_ready <- state = `Started)
   end
 
-class virtual active_source ?get_clock ~name ~content_kind ~clock_safe
-  ~(on_start : unit -> unit) ~(on_stop : unit -> unit) ~fallible ~autostart () =
-  let get_clock =
-    Option.value ~default:(fun () -> new Clock.clock name) get_clock
-  in
-  object (self)
-    inherit Source.active_source ~name content_kind as super
-    inherit base ~on_start ~on_stop as base
-    method stype = if fallible then `Fallible else `Infallible
-    method private wake_up _ = if autostart then base#transition_to `Started
-    method private sleep = base#transition_to `Stopped
-    method is_ready = state = `Started
-    val mutable clock = None
-
-    method private get_clock =
-      match clock with
-        | Some c -> c
-        | None ->
-            let c = get_clock () in
-            clock <- Some c;
-            c
-
-    method private set_clock =
-      super#set_clock;
-      if clock_safe then
-        Clock.unify self#clock
-          (Clock.create_known (self#get_clock :> Clock.clock))
-
-    method virtual private get_frame : Frame.t -> unit
-    method virtual private memo : Frame.t
-
-    method private output =
-      if self#is_ready && AFrame.is_partial self#memo then
-        self#get_frame self#memo
-  end
-
-let output_proto =
+let proto =
   [
     ( "on_start",
       Lang.fun_t [] Lang.unit_t,
@@ -115,27 +95,6 @@ let output_proto =
       Some (Lang.bool true),
       Some "Start input as soon as it is available." );
   ]
-
-let active_source_proto ~fallible_opt ~clock_safe =
-  output_proto
-  @ [
-      ( "clock_safe",
-        Lang.bool_t,
-        Some (Lang.bool clock_safe),
-        Some "Force the use of a dedicated clock" );
-    ]
-  @
-  match fallible_opt with
-    | `Nope -> []
-    | `Yep v ->
-        [
-          ( "fallible",
-            Lang.bool_t,
-            Some (Lang.bool v),
-            Some
-              "Allow the source to fail. If set to `false`, `start` must be \
-               `true` and `stop` method raises an error." );
-        ]
 
 type 'a meth = string * Lang.scheme * string * ('a -> Lang.value)
 
@@ -160,15 +119,6 @@ let meth :
         "Ask the source or output to stop.",
         fun s ->
           val_fun [] (fun _ ->
-              if s#stype = `Infallible then
-                raise
-                  Term.(
-                    Runtime_error
-                      {
-                        kind = "input";
-                        msg = "Source is infallible and cannot be stopped";
-                        pos = [];
-                      });
               s#transition_to `Stopped;
               unit) );
     ]

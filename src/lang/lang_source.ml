@@ -24,7 +24,8 @@ open Lang_core
 
 (* Augment source_t and source with default methods. *)
 
-let source_methods =
+let source_methods :
+    (string * Type.scheme * string * (Source.source -> value)) list =
   [
     ( "id",
       ([], fun_t [] string_t),
@@ -36,13 +37,61 @@ let source_methods =
        source is currently streaming, just that its resources are all properly \
        initialized.",
       fun s -> val_fun [] (fun _ -> bool s#is_ready) );
+    ( " on_error",
+      ( [],
+        fun_t
+          [(false, "", fun_t [(false, "", Lang_error.error_t)] unit_t)]
+          unit_t ),
+      "Call a given handler on streaming errors.",
+      fun s ->
+        val_fun [("", "", None)] (fun p ->
+            let f = assoc "" 1 p in
+            let on_error ~bt exn =
+              let msg =
+                Printf.sprintf "%s\nBacktrace:\n%s" (Printexc.to_string exn)
+                  (Printexc.raw_backtrace_to_string bt)
+              in
+              ignore
+                (apply f
+                   [
+                     ( "",
+                       Lang_error.error
+                         { Runtime_error.kind = "source"; msg; pos = [] } );
+                   ])
+            in
+            s#on_error on_error;
+            unit) );
     ( "on_metadata",
-      ([], fun_t [(false, "", fun_t [(false, "", metadata_t)] unit_t)] unit_t),
+      ( [],
+        fun_t
+          [
+            ( false,
+              "",
+              fun_t [(false, "position", int_t); (false, "", metadata_t)] unit_t
+            );
+          ]
+          unit_t ),
       "Call a given handler on metadata packets.",
       fun s ->
         val_fun [("", "", None)] (fun p ->
             let f = assoc "" 1 p in
-            s#on_metadata (fun m -> ignore (apply f [("", metadata m)]));
+            s#on_metadata (fun ~pos:_ m -> ignore (apply f [("", metadata m)]));
+            unit) );
+    ( "on_track",
+      ([], fun_t [(false, "", fun_t [(false, "", unit_t)] unit_t)] unit_t),
+      "Call a given handler on new tracks.",
+      fun s ->
+        val_fun [("", "", None)] (fun p ->
+            let f = assoc "" 1 p in
+            s#on_track (fun _ -> ignore (apply f [("", unit)]));
+            unit) );
+    ( "on_initialize",
+      ([], fun_t [(false, "", fun_t [] unit_t)] unit_t),
+      "Register a function to be called when source is initialized.",
+      fun s ->
+        val_fun [("", "", None)] (fun p ->
+            let f = assoc "" 1 p in
+            s#on_initialize (fun () -> ignore (apply f []));
             unit) );
     ( "on_shutdown",
       ([], fun_t [(false, "", fun_t [] unit_t)] unit_t),
@@ -51,23 +100,6 @@ let source_methods =
         val_fun [("", "", None)] (fun p ->
             let f = assoc "" 1 p in
             s#on_shutdown (fun () -> ignore (apply f []));
-            unit) );
-    ( "on_leave",
-      ([], fun_t [(false, "", fun_t [] unit_t)] unit_t),
-      "Register a function to be called when source is not used anymore by \
-       another source.",
-      fun s ->
-        val_fun [("", "", None)] (fun p ->
-            let f = assoc "" 1 p in
-            s#on_leave (fun () -> ignore (apply f []));
-            unit) );
-    ( "on_track",
-      ([], fun_t [(false, "", fun_t [(false, "", metadata_t)] unit_t)] unit_t),
-      "Call a given handler on new tracks.",
-      fun s ->
-        val_fun [("", "", None)] (fun p ->
-            let f = assoc "" 1 p in
-            s#on_track (fun m -> ignore (apply f [("", metadata m)]));
             unit) );
     ( "remaining",
       ([], fun_t [] float_t),
@@ -126,12 +158,6 @@ let source_methods =
                         unit) );
                 ] );
           ] );
-    ( "is_up",
-      ([], fun_t [] bool_t),
-      "Indicate that the source can be asked to produce some data at any time. \
-       This is `true` when the source is currently being used or if it could \
-       be used at any time, typically inside a `switch` or `fallback`.",
-      fun s -> val_fun [] (fun _ -> bool s#is_up) );
     ( "is_active",
       ([], fun_t [] bool_t),
       "`true` if the source is active, i.e. it is continuously animated by its \
@@ -164,26 +190,8 @@ let source_methods =
       "Deactivate a source.",
       fun s ->
         val_fun [] (fun _ ->
-            (Clock.get s#clock)#detach (fun (s' : Source.active_source) ->
-                (s' :> Source.source) = (s :> Source.source));
+            s#clock#remove_source (s :> Clock.source);
             unit) );
-    ( "time",
-      ([], fun_t [] float_t),
-      "Get a source's time, based on its assigned clock.",
-      fun s ->
-        val_fun [] (fun _ ->
-            let ticks =
-              if Source.Clock_variables.is_known s#clock then
-                (Source.Clock_variables.get s#clock)#get_tick
-              else 0
-            in
-            let frame_position =
-              Lazy.force Frame.duration *. float_of_int ticks
-            in
-            let in_frame_position =
-              Frame.seconds_of_main (Frame.position s#memo)
-            in
-            float (frame_position +. in_frame_position)) );
   ]
 
 let source_t ?(methods = false) t =
@@ -220,7 +228,7 @@ type 'a operator_method = string * scheme * string * ('a -> value)
 let add_operator =
   let _meth = meth in
   fun ~(category : Documentation.source) ~descr ?(flags = [])
-      ?(meth = ([] : 'a operator_method list)) name proto ~return_t f ->
+      ?(meth = ([] : 'a operator_method list)) ?clock name proto ~return_t f ->
     let compare (x, _, _, _) (y, _, _, _) =
       match (x, y) with
         | "", "" -> 0
@@ -228,15 +236,29 @@ let add_operator =
         | "", _ -> 1
         | x, y -> Stdlib.compare x y
     in
+    let clock =
+      Option.value ~default:null
+        (Option.map (fun c -> ClockValue.to_value c) clock)
+    in
     let proto =
-      ( "id",
-        nullable_t string_t,
-        Some null,
-        Some "Force the value of the source ID." )
-      :: List.stable_sort compare proto
+      [
+        ( "id",
+          nullable_t string_t,
+          Some null,
+          Some "Force the value of the source ID." );
+        ( "clock",
+          nullable_t ClockValue.t,
+          Some clock,
+          Some "Source clock, for advanced use only!" );
+      ]
+      @ List.stable_sort compare proto
     in
     let f env =
       let src : < Source.source ; .. > = f env in
+      ignore
+        (Option.map
+           (fun c -> src#set_clock c)
+           (to_valued_option ClockValue.of_value (List.assoc "clock" env)));
       ignore
         (Option.map
            (fun id -> src#set_id id)
@@ -255,7 +277,6 @@ let add_operator =
       with
         | Source.Clock_conflict (a, b) ->
             raise (Error.Clock_conflict (pos, a, b))
-        | Source.Clock_loop (a, b) -> raise (Error.Clock_loop (pos, a, b))
         | Kind.Conflict (a, b) -> raise (Error.Kind_conflict (pos, a, b))
     in
     let return_t = source_t ~methods:true return_t in

@@ -83,12 +83,6 @@ let () =
     (fun p -> Lang.bool (Lang.to_source (List.assoc "" p))#is_ready)
 
 let () =
-  Lang.add_builtin "source.is_up" ~category:`System
-    [("", Lang.source_t (Lang.univ_t ()), None, None)]
-    Lang.bool_t ~descr:"Check whether a source is up."
-    (fun p -> Lang.bool (Lang.to_source (Lang.assoc "" 1 p))#is_up)
-
-let () =
   Lang.add_builtin "source.remaining" ~category:`Liquidsoap
     ~descr:"Estimation of remaining time in the current track."
     [("", Lang.source_t (Lang.univ_t ()), None, None)]
@@ -125,25 +119,8 @@ let () =
     Lang.unit_t
     (fun p ->
       let s = Lang.to_source (List.assoc "" p) in
-      (Clock.get s#clock)#detach (fun (s' : Source.active_source) ->
-          (s' :> Source.source) = s);
+      s#shutdown;
       Lang.unit)
-
-let () =
-  Lang.add_builtin ~category:`Liquidsoap "source.time"
-    ~descr:"Get a source's time, based on its assigned clock"
-    [("", Lang.source_t (Lang.univ_t ()), None, None)]
-    Lang.float_t
-    (fun p ->
-      let s = Lang.to_source (List.assoc "" p) in
-      let ticks =
-        if Source.Clock_variables.is_known s#clock then
-          (Source.Clock_variables.get s#clock)#get_tick
-        else 0
-      in
-      let frame_position = Lazy.force Frame.duration *. float ticks in
-      let in_frame_position = Frame.seconds_of_main (Frame.position s#memo) in
-      Lang.float (frame_position +. in_frame_position))
 
 let () =
   Lang.add_builtin "source.on_metadata" ~category:`Liquidsoap
@@ -156,7 +133,8 @@ let () =
     (fun p ->
       let s = Lang.assoc "" 1 p |> Lang.to_source in
       let f = Lang.assoc "" 2 p in
-      s#on_metadata (fun m -> ignore (Lang.apply f [("", Lang.metadata m)]));
+      s#on_metadata (fun ~pos:_ m ->
+          ignore (Lang.apply f [("", Lang.metadata m)]));
       Lang.unit)
 
 let () =
@@ -164,30 +142,13 @@ let () =
     ~descr:"Call a given handler on new tracks."
     [
       ("", Lang.source_t (Lang.univ_t ()), None, None);
-      ("", Lang.fun_t [(false, "", Lang.metadata_t)] Lang.unit_t, None, None);
+      ("", Lang.fun_t [] Lang.unit_t, None, None);
     ]
     Lang.unit_t
     (fun p ->
       let s = Lang.assoc "" 1 p |> Lang.to_source in
       let f = Lang.assoc "" 2 p in
-      s#on_track (fun m -> ignore (Lang.apply f [("", Lang.metadata m)]));
-      Lang.unit)
-
-let () =
-  Lang.add_builtin "source.on_leave" ~category:`System
-    [
-      ("", Lang.source_t (Lang.univ_t ()), None, None);
-      ("", Lang.fun_t [] Lang.unit_t, None, None);
-    ]
-    Lang.unit_t
-    ~descr:
-      "Register a function to be called when source is not used anymore by \
-       another source."
-    (fun p ->
-      let s = Lang.to_source (Lang.assoc "" 1 p) in
-      let f = Lang.assoc "" 2 p in
-      let wrap_f () = ignore (Lang.apply f []) in
-      s#on_leave wrap_f;
+      s#on_track (fun _ -> ignore (Lang.apply f []));
       Lang.unit)
 
 let () =
@@ -205,30 +166,7 @@ let () =
       s#on_shutdown wrap_f;
       Lang.unit)
 
-let () =
-  let s_t =
-    let kind = Lang.any in
-    Lang.source_t (Lang.kind_type_of_kind_format kind)
-  in
-  Lang.add_builtin "source.init" ~category:`Liquidsoap
-    ~descr:
-      "Simultaneously initialize sources, return the sublist of sources that \
-       failed to initialize."
-    ~flags:[`Experimental]
-    [("", Lang.list_t s_t, None, None)]
-    (Lang.list_t s_t)
-    (fun p ->
-      let l = Lang.to_list (List.assoc "" p) in
-      let l = List.map Lang.to_source l in
-      let l =
-        (* TODO this whole function should be about active sources,
-         *   just like source.shutdown() but the language has no runtime
-         *   difference between sources and active sources, so we use
-         *   this trick to compare active sources and passive ones... *)
-        Clock.force_init (fun x -> List.exists (fun y -> Oo.id x = Oo.id y) l)
-      in
-      Lang.list (List.map (fun x -> Lang.source (x :> Source.source)) l))
-
+(*
 let () =
   let log = Log.make ["source"; "dump"] in
   let kind = Lang.univ_t () in
@@ -259,3 +197,4 @@ let () =
       log#info "Source dumped.";
       fo#leave s;
       Lang.unit)
+*)

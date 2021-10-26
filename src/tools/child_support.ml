@@ -20,11 +20,9 @@
 
  *****************************************************************************)
 
-(** Utility for operators that need to control child source clocks. See [clock.mli]
-    for a more detailed description. *)
+(** Utility for operators that need to control child source clocks. *)
 
-let finalise_child_clock child_clock source =
-  Clock.forget source#clock child_clock
+open Clock.Tick
 
 class virtual base ~check_self_sync children_val =
   let children = List.map Lang.to_source children_val in
@@ -42,40 +40,23 @@ class virtual base ~check_self_sync children_val =
         children_val
 
     val mutable child_clock = None
-
-    (* If [true] during [#after_output], issue a [#end_tick] call
-       on the child clock, which makes it perform a whole streaming
-       loop. *)
     val mutable needs_tick = true
     method virtual id : string
-    method virtual clock : Source.clock_variable
+    method virtual clock : Clock.t
+    method virtual on_initialize : (unit -> unit) -> unit
+    method virtual on_before_streaming_cycle_start : (unit -> unit) -> unit
+    method virtual on_after_get_frame : (unit -> unit Clock.tick) -> unit
     method private child_clock = Option.get child_clock
 
-    method private set_clock =
-      child_clock <-
-        Some
-          (Clock.create_known
-             (new Clock.clock ~start:false (Printf.sprintf "%s.child" self#id)));
-
-      Clock.unify self#clock
-        (Clock.create_unknown ~sources:[] ~sub_clocks:[self#child_clock]);
-
-      List.iter (fun c -> Clock.unify self#child_clock c#clock) children;
-
-      Gc.finalise (finalise_child_clock self#child_clock) self
-
-    method private child_tick =
-      (Clock.get self#child_clock)#end_tick;
-      List.iter (fun c -> c#after_output) children;
-      needs_tick <- false
-
-    (* This methods always set [need_tick] to true. If the source is not
-       [#is_ready], [#after_output] is called during a clock tick,
-       which means that the children clock is _always_ animated by the
-       main clock when the source becomes unavailable. Otherwise, we
-       expect the source to make a decision about executing a child clock
-       tick as part of its [#get_frame] implementation. See [cross.ml] or
-       [soundtouch.ml] as examples. *)
-    method before_output = needs_tick <- true
-    method after_output = if needs_tick then self#child_tick
+    initializer
+    self#on_initialize (fun () ->
+        let c =
+          Clock.make ~sync:`None ~id:(Printf.sprintf "%s.child" self#id) ()
+        in
+        child_clock <- Some c;
+        List.iter (fun s -> s#set_clock c) children);
+    self#on_before_streaming_cycle_start (fun () -> needs_tick <- true);
+    self#on_after_get_frame (fun () ->
+        if needs_tick then self#child_clock#tick >> fun _ -> return ()
+        else return ())
   end

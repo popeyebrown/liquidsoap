@@ -64,50 +64,41 @@ protocols = \
 	protocols/mpd.ml
 
 sources = \
-	sources/synthesized.ml sources/noise.ml sources/blank.ml sources/debug_sources.ml \
-	sources/audio_gen.ml sources/request_source.ml sources/latest_metadata.ml \
-	sources/request_simple.ml sources/generated.ml \
-	harbor/harbor_base.ml harbor/harbor.ml sources/harbor_input.ml \
-	$(if $(W_SSL),harbor/harbor_ssl.ml sources/harbor_input_ssl.ml) \
-	$(if $(W_OSX_SECURE_TRANSPORT),harbor/harbor_secure_transport.ml sources/harbor_input_secure_transport.ml) \
-        tools/external_input.ml sources/external_input_audio.ml sources/external_input_video.ml \
-	tools/sandbox.ml \
-	$(if $(W_BJACK),sources/bjack_in.ml) \
-	$(if $(W_ALSA),sources/alsa_in.ml)
+	sources/synthesized.ml sources/noise.ml tools/sandbox.ml
 
 operators = \
-	operators/insert_metadata.ml operators/map_metadata.ml \
-	operators/on_end.ml operators/on_frame.ml operators/delay.ml \
-	operators/max_duration.ml operators/sequence.ml operators/add.ml \
-	operators/switch.ml operators/cross.ml \
-	operators/pitch.ml operators/pipe.ml operators/filter.ml \
-	operators/fir_filter.ml operators/iir_filter.ml operators/filter_rc.ml \
-	operators/biquad_filter.ml operators/cuepoint.ml \
-	operators/map_op.ml operators/flanger.ml operators/comb.ml \
-	operators/compress.ml operators/compress_old.ml operators/compress_exp.ml operators/clip.ml \
-	operators/amplify.ml operators/normalize.ml operators/echo.ml operators/gate.ml \
-	operators/append.ml operators/pan.ml operators/ms_stereo.ml \
-	operators/dyn_op.ml operators/video_effects.ml operators/video_fade.ml \
-	operators/noblank.ml operators/compand.ml operators/on_offset.ml \
-	operators/prepend.ml operators/lufs.ml operators/available.ml \
-	operators/midi_routing.ml operators/sleeper.ml \
-	operators/time_warp.ml operators/resample.ml \
-	operators/chord.ml operators/video_text.ml operators/window_op.ml \
-	operators/rms_smooth.ml operators/delay_line.ml \
-	operators/video_text_native.ml operators/accelerate.ml \
-	operators/still_frame.ml operators/dtmf.ml \
-	$(if $(W_SOUNDTOUCH),operators/soundtouch_op.ml) \
-	$(if $(W_SOUNDTOUCH),operators/st_bpm.ml) \
-	$(if $(W_LADSPA),operators/ladspa_op.ml) \
-	$(if $(W_LILV),operators/lilv_op.ml) \
-	$(if $(W_FREI0R),operators/frei0r_op.ml) \
-	$(if $(W_GD),operators/video_text_gd.ml) \
-	$(if $(W_SDL_TTF),operators/video_text_sdl.ml) \
-	$(if $(W_GSTREAMER),operators/video_text_gstreamer.ml)
+#	operators/insert_metadata.ml operators/map_metadata.ml \
+#	operators/on_end.ml operators/on_frame.ml operators/delay.ml \
+#	operators/max_duration.ml operators/sequence.ml operators/add.ml \
+#	operators/switch.ml operators/cross.ml \
+#	operators/pitch.ml operators/pipe.ml operators/filter.ml \
+#	operators/fir_filter.ml operators/iir_filter.ml operators/filter_rc.ml \
+#	operators/biquad_filter.ml operators/cuepoint.ml \
+#	operators/map_op.ml operators/flanger.ml operators/comb.ml \
+#	operators/compress.ml operators/compress_old.ml operators/compress_exp.ml operators/clip.ml \
+#	operators/amplify.ml operators/normalize.ml operators/echo.ml operators/gate.ml \
+#	operators/append.ml operators/pan.ml operators/ms_stereo.ml \
+#	operators/dyn_op.ml operators/video_effects.ml operators/video_fade.ml \
+#	operators/noblank.ml operators/compand.ml operators/on_offset.ml \
+#	operators/prepend.ml operators/lufs.ml operators/available.ml \
+#	operators/midi_routing.ml operators/sleeper.ml \
+#	operators/time_warp.ml operators/resample.ml \
+#	operators/chord.ml operators/video_text.ml operators/window_op.ml \
+#	operators/rms_smooth.ml operators/delay_line.ml \
+#	operators/video_text_native.ml operators/accelerate.ml \
+#	operators/still_frame.ml operators/dtmf.ml \
+#	$(if $(W_SOUNDTOUCH),operators/soundtouch_op.ml) \
+#	$(if $(W_SOUNDTOUCH),operators/st_bpm.ml) \
+#	$(if $(W_LADSPA),operators/ladspa_op.ml) \
+#	$(if $(W_LILV),operators/lilv_op.ml) \
+#	$(if $(W_FREI0R),operators/frei0r_op.ml) \
+#	$(if $(W_GD),operators/video_text_gd.ml) \
+#	$(if $(W_SDL_TTF),operators/video_text_sdl.ml) \
+#	$(if $(W_GSTREAMER),operators/video_text_gstreamer.ml)
 
 conversions = \
-	conversions/conversion.ml conversions/audio_to_stereo.ml conversions/drop.ml \
-	conversions/swap.ml conversions/mean.ml conversions/mux.ml
+#	conversions/conversion.ml conversions/audio_to_stereo.ml conversions/drop.ml \
+#	conversions/swap.ml conversions/mean.ml conversions/mux.ml
 
 encoders = \
 	encoder/wav_encoder.ml \
@@ -151,26 +142,27 @@ encoder_formats = \
   encoder_formats/wav_format.ml
 
 outputs = outputs/output.ml \
-	outputs/pipe_output.ml outputs/hls_output.ml \
-	outputs/harbor_output.ml \
-	$(if $(W_SSL),outputs/harbor_output_ssl.ml) \
-	$(if $(W_OSX_SECURE_TRANSPORT),outputs/harbor_output_secure_transport.ml) \
 	$(if $(W_AO),outputs/ao_out.ml) \
-	$(if $(W_CRY),outputs/icecast2.ml) \
-	$(if $(W_GRAPHICS),outputs/graphics_out.ml) \
-	$(if $(W_BJACK),outputs/bjack_out.ml) \
-	$(if $(W_SDL),outputs/sdl_out.ml) \
-	$(if $(W_ALSA),outputs/alsa_out.ml)
+#	outputs/pipe_output.ml outputs/hls_output.ml \
+#	outputs/harbor_output.ml \
+#	$(if $(W_SSL),outputs/harbor_output_ssl.ml) \
+#	$(if $(W_OSX_SECURE_TRANSPORT),outputs/harbor_output_secure_transport.ml) \
+#	$(if $(W_CRY),outputs/icecast2.ml) \
+#	$(if $(W_GRAPHICS),outputs/graphics_out.ml) \
+#	$(if $(W_BJACK),outputs/bjack_out.ml) \
+#	$(if $(W_SDL),outputs/sdl_out.ml) \
+#	$(if $(W_ALSA),outputs/alsa_out.ml)
 
-io = io/udp_io.ml \
-	$(if $(W_SRT),io/srt_io.ml) \
-	$(if $(W_OSS),io/oss_io.ml) \
-	$(if $(W_PULSEAUDIO),io/pulseaudio_io.ml) \
-	$(if $(W_PORTAUDIO),io/portaudio_io.ml) \
-	$(if $(W_ALSA),io/alsa_io.ml) \
-	$(if $(W_GSTREAMER),io/gstreamer_io.ml) \
-	$(if $(W_FFMPEG_LIQ_FILTER),io/ffmpeg_filter_io.ml) \
-	$(if $(W_FFMPEG_AV),io/ffmpeg_io.ml)
+io = \
+#	io/udp_io.ml \
+#	$(if $(W_SRT),io/srt_io.ml) \
+#	$(if $(W_OSS),io/oss_io.ml) \
+#	$(if $(W_PULSEAUDIO),io/pulseaudio_io.ml) \
+#	$(if $(W_PORTAUDIO),io/portaudio_io.ml) \
+#	$(if $(W_ALSA),io/alsa_io.ml) \
+#	$(if $(W_GSTREAMER),io/gstreamer_io.ml) \
+#	$(if $(W_FFMPEG_LIQ_FILTER),io/ffmpeg_filter_io.ml) \
+#	$(if $(W_FFMPEG_AV),io/ffmpeg_io.ml)
 
 tools = tools/extralib.ml tools/lifecycle.ml \
 	tools/stringView.ml tools/strings.ml tools/utils.ml \
@@ -202,13 +194,14 @@ stream = stream/frame_base.ml stream/content_base.ml stream/content_internal.ml 
          $(if $(W_GSTREAMER),tools/gstreamer_utils.ml)
 
 visualization = \
-	visualization/midimeter.ml \
-	visualization/video_volume.ml \
-	$(if $(W_GRAPHICS),visualization/vis_volume.ml)
+#	visualization/midimeter.ml \
+#	visualization/video_volume.ml \
+#	$(if $(W_GRAPHICS),visualization/vis_volume.ml)
 
-synth = synth/keyboard.ml synth/synth_op.ml \
-	$(if $(W_DSSI),synth/dssi_op.ml) \
-	$(if $(W_SDL),synth/keyboard_sdl.ml)
+synth = \
+#	synth/keyboard.ml synth/synth_op.ml \
+#	$(if $(W_DSSI),synth/dssi_op.ml) \
+#	$(if $(W_SDL),synth/keyboard_sdl.ml)
 
 builtins = lang/lang_builtins.ml \
            lang/builtins_ref.ml lang/builtins_socket.ml \
@@ -221,20 +214,7 @@ builtins = lang/lang_builtins.ml \
 	   lang/builtins_files.ml lang/builtins_resolvers.ml \
            lang/builtins_thread.ml lang/builtins_process.ml \
            lang/builtins_source.ml lang/builtins_getter.ml \
-           lang/builtins_profiler.ml lang/builtins_eval.ml \
-	   $(if $(W_CURL),lang/builtins_http.ml) \
-           lang/builtins_harbor.ml \
-           $(if $(W_SSL),lang/builtins_harbor_ssl.ml) \
-           $(if $(W_OSX_SECURE_TRANSPORT),lang/builtins_harbor_secure_transport.ml) \
-           $(if $(W_LO),lang/builtins_lo.ml) \
-           $(if $(W_MAGIC),lang/builtins_magic.ml) \
-           $(if $(W_CRY),lang/builtins_cry.ml) \
-           $(if $(W_LASTFM),lang/builtins_lastfm.ml) \
-           $(if $(W_PROMETHEUS),lang/builtins_prometheus.ml) \
-           lang/builtins_ffmpeg_base.ml \
-           $(if $(W_FFMPEG_ENCODER),lang/builtins_ffmpeg_encoder.ml) \
-           $(if $(W_FFMPEG_DECODER),lang/builtins_ffmpeg_decoder.ml) \
-           $(if $(W_FFMPEG_LIQ_FILTER),lang/builtins_ffmpeg_filters.ml)
+           lang/builtins_profiler.ml lang/builtins_eval.ml
 
 liquidsoap_sources= \
 	tools/log.ml $(tools) converters/audio_converter.ml $(stream) \
@@ -244,7 +224,7 @@ liquidsoap_sources= \
 	decoder/decoder_utils.ml decoder/decoder.ml \
         tools/liq_time.ml $(if $(W_POSIX_TIME2),tools/liq_posix_time.ml) \
         request.ml tools/server.ml \
-        source.ml clock.ml playlist_parser.ml \
+        clock.ml source.ml playlist_parser.ml \
 	$(encoder_formats) encoder.ml \
 	tools/server_builtins.ml \
 	$(if $(W_SDL),tools/sdl_utils.ml) \
@@ -267,7 +247,7 @@ liquidsoap_sources += \
 	tools/start_stop.ml tools/ioRing.ml \
 	tools/icecast_utils.ml tools/avi.ml \
 	$(video_converters) $(audio_converters) $(protocols) \
-	$(sources) $(outputs) tools/producer_consumer.ml \
+	$(sources) $(outputs) \
 	$(conversions) $(operators) \
 	$(encoders) $(decoders) $(ogg_demuxer) $(ogg_muxer) \
 	$(playlists) $(visualization) $(synth) $(io) \

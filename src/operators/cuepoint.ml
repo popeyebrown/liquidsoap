@@ -159,7 +159,7 @@ class cue_cut ~kind ~m_cue_in ~m_cue_out ~on_cue_in ~on_cue_out source_val =
       source#abort_track;
       self#child_tick;
       Frame.set_breaks buf breaks;
-      Frame.add_break buf (Frame.position buf);
+      Frame.add_track_mark buf (Frame.position buf);
       on_cue_out ();
       `Idle
 

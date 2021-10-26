@@ -353,7 +353,7 @@ let iter_sources = iter_sources ~static_analysis_failed:(ref [])
 
 (* Delay this function in order not to have Lang depend on Evaluation. *)
 let apply_fun : (value -> env -> value) ref = ref (fun _ -> assert false)
-let apply f p = Clock.collect_after (fun () -> !apply_fun f p)
+let apply f p = !apply_fun f p
 
 (** {1 High-level manipulation of values} *)
 
