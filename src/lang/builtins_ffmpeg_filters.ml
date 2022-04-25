@@ -156,7 +156,7 @@ let uniq_name =
 
 exception No_value_for_option
 
-let mk_options { Avfilter.options } =
+let mk_options options =
   Avutil.Options.(
     let mk_opt ~t ~to_string ~from_value name help { default; min; max; values }
         =
@@ -450,7 +450,7 @@ let () =
     in
     List.iter
       (fun ({ name; description; io; flags } as filter) ->
-        let args, args_parser = mk_options filter in
+        let args, args_parser = mk_options filter.options in
         let args_t = args @ [("", Graph.t, None, None)] in
         let sources_t =
           List.map

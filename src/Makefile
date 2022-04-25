@@ -232,7 +232,7 @@ builtins = lang/lang_builtins.ml \
            $(if $(W_LASTFM),lang/builtins_lastfm.ml) \
            $(if $(W_PROMETHEUS),lang/builtins_prometheus.ml) \
            lang/builtins_ffmpeg_base.ml \
-           $(if $(W_FFMPEG),lang/builtins_ffmpeg_encoder.ml lang/builtins_ffmpeg_decoder.ml lang/builtins_ffmpeg_filters.ml)
+           $(if $(W_FFMPEG),lang/builtins_ffmpeg_encoder.ml lang/builtins_ffmpeg_decoder.ml lang/builtins_ffmpeg_filters.ml lang/builtins_ffmpeg_bitstream_filters.ml)
 
 liquidsoap_sources= \
 	tools/log.ml $(tools) converters/audio_converter.ml $(stream) \
