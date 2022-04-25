@@ -73,12 +73,11 @@ let mk_stream_copy ~video_size ~get_stream ~keyframe_opt ~get_data output =
     let dts = to_main (Avcodec.Packet.get_dts packet) in
     let duration = to_main (Avcodec.Packet.get_duration packet) in
     if !current_stream.idx <> stream_idx then (
-      offset := Option.value ~default:0L dts;
+      offset := Int64.pred (Option.value ~default:0L dts);
       let last_start = Int64.sub !current_position !offset in
       (match (keyframe_opt, !intra_only) with
         | _, true -> keyframe_action := `Ignore
         | `Wait_for_keyframe, _ -> keyframe_action := `Wait
-        | `Replay_keyframe, _ -> keyframe_action := `Replay
         | `Ignore_keyframe, _ -> keyframe_action := `Ignore);
       current_stream :=
         get_stream ~last_start
@@ -159,17 +158,7 @@ let mk_stream_copy ~video_size ~get_stream ~keyframe_opt ~get_data output =
             | `Wait ->
                 if !was_keyframe || latest_keyframe = `No_keyframe then (
                   !current_stream.waiting_for_keyframe <- false;
-                  keyframe_action := `Ignore)
-            | `Replay ->
-                (match latest_keyframe with
-                  | `No_keyframe | `Not_seen -> ()
-                  | `Seen keyframe ->
-                      Packet.set_pts keyframe
-                        (Option.map Int64.pred (Packet.get_pts packet));
-                      Packet.set_dts keyframe
-                        (Option.map Int64.pred (Packet.get_dts packet));
-                      push ~time_base ~stream keyframe);
-                keyframe_action := `Ignore);
+                  keyframe_action := `Ignore));
           if not !current_stream.waiting_for_keyframe then
             push ~time_base ~stream packet))
       data

@@ -23,7 +23,7 @@
 type opt_val =
   [ `String of string | `Int of int | `Int64 of int64 | `Float of float ]
 
-type copy_opt = [ `Wait_for_keyframe | `Replay_keyframe | `Ignore_keyframe ]
+type copy_opt = [ `Wait_for_keyframe | `Ignore_keyframe ]
 type output = [ `Stream | `Url of string ]
 type opts = (string, opt_val) Hashtbl.t
 
@@ -69,7 +69,6 @@ let string_of_options
 
 let string_of_copy_opt = function
   | `Wait_for_keyframe -> "wait_for_keyframe"
-  | `Replay_keyframe -> "replay_keyframe"
   | `Ignore_keyframe -> "ignore_keyframe"
 
 let to_string m =

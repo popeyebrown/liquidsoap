@@ -55,7 +55,6 @@
   * into endless pulling loops. *)
 
 let () =
-  Lang.add_module "ffmpeg.filter";
   Lang.add_module "ffmpeg.filter.audio";
   Lang.add_module "ffmpeg.filter.video"
 

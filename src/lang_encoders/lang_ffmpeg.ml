@@ -88,7 +88,6 @@ let ffmpeg_gen params =
   let copy_opt_of_opt = function
     | None -> `Wait_for_keyframe
     | Some ("wait_for_keyframe", _) -> `Wait_for_keyframe
-    | Some ("replay_keyframe", _) -> `Replay_keyframe
     | Some ("ignore_keyframe", _) -> `Ignore_keyframe
     | Some (v, t) ->
         raise
