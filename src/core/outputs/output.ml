@@ -42,9 +42,8 @@ let meth = Start_stop.meth ()
     ten metadata and setups standard Server commands, including start/stop. By
     default, full frames are played for efficiency unless [allow_partial] is set
     (which can be useful in order to keep track boundaries). *)
-class virtual output ~content_kind ~output_kind ?(name = "")
-  ?(allow_partial = false) ~infallible ~(on_start : unit -> unit)
-  ~(on_stop : unit -> unit) val_source autostart =
+class virtual output ~content_kind ~output_kind ?(name = "") ?(allow_partial=false) ~infallible
+  ~(on_start : unit -> unit) ~(on_stop : unit -> unit) val_source autostart =
   let source = Lang.to_source val_source in
   object (self)
     initializer
@@ -159,10 +158,7 @@ class virtual output ~content_kind ~output_kind ?(name = "")
       if start_stop#state = `Started then (
         (* Complete filling of the frame *)
         let get_count = ref 0 in
-        while
-          (Frame.is_partial self#memo && ((not allow_partial) || !get_count = 0))
-          && self#is_ready
-        do
+        while (Frame.is_partial self#memo && (not allow_partial || !get_count = 0)) && self#is_ready do
           incr get_count;
           if !get_count > Lazy.force Frame.size then
             self#log#severe
@@ -177,7 +173,7 @@ class virtual output ~content_kind ~output_kind ?(name = "")
         if Frame.position self#memo > 0 || allow_partial then (
           self#send_frame self#memo;
           nb_frames <- Int64.succ nb_frames);
-        if (not allow_partial) && Frame.is_partial self#memo then (
+        if not allow_partial && Frame.is_partial self#memo then (
           self#log#important "Source failed (no more tracks) stopping output...";
           self#transition_to `Idle))
 

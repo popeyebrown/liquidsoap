@@ -48,7 +48,7 @@ class consumer ~write_frame ~name ~kind ~source () =
          boundaries. *)
       Output.output
         ~content_kind:kind ~output_kind:name ~infallible ~on_start:noop
-          ~on_stop:noop ~allow_partial:true source true as super
+        ~on_stop:noop ~allow_partial:true source true as super
 
     val mutable output_enabled = false
     method set_output_enabled v = output_enabled <- v
