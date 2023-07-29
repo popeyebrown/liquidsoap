@@ -37,6 +37,11 @@ sed -e 's@ocaml-gstreamer@#ocaml-gstreamer@' -i PACKAGES
 
 export PKG_CONFIG_PATH=/usr/share/pkgconfig/pkgconfig
 
+cd /tmp
+git clone https://github.com/glondu/ocaml-re.git
+cd ocaml-re
+opam install -y .
+
 echo "::endgroup::"
 
 echo "::group::Checking out CI commit"

@@ -107,29 +107,32 @@ let expand_string ?fname tokenizer =
   let pop () = ignore (Queue.take state) in
   let clear () = Queue.clear state in
   let parse s pos =
-    let l = Regexp.split (Regexp.regexp "#{(.*?)}") s in
-    let l = if l = [] then [""] else l in
+    let rex = Re.Pcre.regexp "#\\{(.*?)\\}" in
+    let l = Re.Pcre.full_split ~rex s in
+    let l = if l = [] then [Re.Pcre.Text s] else l in
     let add = add pos in
-    let rec parse = function
-      | s :: x :: l ->
+    let rec parse ~has_expr = function
+      | Re.Pcre.Text x :: l ->
+          add (String x);
+          parse ~has_expr l
+      | Re.Pcre.Delim _ :: Re.Pcre.Group (_, x) :: l ->
           let lexbuf = Sedlexing.Utf8.from_string x in
           let tokenizer = mk_tokenizer ?fname lexbuf in
           let tokenizer () = (fst (tokenizer ()), pos) in
-          List.iter add [String s; Expr tokenizer];
-          parse l
-      | x :: l ->
-          add (String x);
-          parse l
-      | [] -> add End
+          add (Expr tokenizer);
+          parse ~has_expr:true l
+      | [] ->
+          add End;
+          has_expr
+      | _ -> assert false
     in
-    parse l
+    parse ~has_expr:false l
   in
   let rec token () =
     if Queue.is_empty state then (
       match tokenizer () with
         | Parser.STRING s, pos ->
-            parse s pos;
-            if Queue.length state > 2 then (Parser.BEGIN_INTERPOLATION, pos)
+            if parse s pos then (Parser.BEGIN_INTERPOLATION, pos)
             else (
               clear ();
               (Parser.STRING s, pos))
