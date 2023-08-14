@@ -38,6 +38,18 @@ class append ~insert_missing ~merge source f =
   object (self)
     inherit operator ~name:"append" [source]
 
+    method private time =
+      let ticks =
+        if Source.Clock_variables.is_known self#clock then
+          (Source.Clock_variables.get self#clock)#get_tick
+        else 0
+      in
+      let frame_position = Lazy.force Frame.duration *. float ticks in
+      let in_frame_position =
+        Frame.seconds_of_main (Frame.position self#memo)
+      in
+      frame_position +. in_frame_position
+
     method private get_frame buf =
       match Atomic.get state with
         | `Idle -> (
@@ -52,9 +64,20 @@ class append ~insert_missing ~merge source f =
                   let append =
                     Lang.to_source (Lang.apply f [("", Lang.metadata m)])
                   in
+                  self#log#important
+                    "at source time %.02fs with %.02fs remaining, append \
+                     source created for metadata: %s"
+                    self#time
+                    (Frame.seconds_of_main self#remaining)
+                    (Request.string_of_metadata m);
                   self#register append;
                   if finished then
                     if append#is_ready then (
+                      self#log#important
+                        "at source time %.02fs with %.02fs remaining, switch \
+                         to append source"
+                        self#time
+                        (Frame.seconds_of_main self#remaining);
                       Atomic.set state (`Append append);
                       if merge then (
                         let pos = Frame.position buf in
@@ -79,6 +102,11 @@ class append ~insert_missing ~merge source f =
             source#get buf;
             if Frame.is_partial buf then
               if a#is_ready then (
+                self#log#important
+                  "at source time %.02fs with %.02fs remaining, switch to \
+                   append source"
+                  self#time
+                  (Frame.seconds_of_main self#remaining);
                 Atomic.set state (`Append a);
                 if merge then (
                   let pos = Frame.position buf in
@@ -93,6 +121,11 @@ class append ~insert_missing ~merge source f =
         | `Append a ->
             a#get buf;
             if Frame.is_partial buf then (
+              self#log#important
+                "at source time %.02fs with %.02fs remaining, switch away from \
+                 append source"
+                self#time
+                (Frame.seconds_of_main self#remaining);
               Atomic.set state `Idle;
               self#unregister a)
 
