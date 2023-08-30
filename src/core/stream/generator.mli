@@ -61,6 +61,7 @@ val set_field : t -> Frame_base.field -> Content.data -> unit
 val field_length : t -> Frame_base.field -> int
 val length : t -> int
 val buffered_length : t -> int
+val log : t -> string -> unit
 
 (* Remaining time before the next track mark or -1 if no
    track marks are present. *)

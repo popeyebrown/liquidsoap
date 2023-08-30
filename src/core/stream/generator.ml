@@ -40,7 +40,8 @@ let add_timed_content content =
 let make_content ?length content_type =
   add_timed_content (Frame_base.Fields.map (Content.make ?length) content_type)
 
-let create ?(log = fun s -> log#info "%s" s) ?max_length ?length content_type =
+let create ?(log = fun s -> log#important "%s" s) ?max_length ?length
+    content_type =
   {
     lock = Mutex.create ();
     max_length = Atomic.make max_length;
@@ -49,6 +50,7 @@ let create ?(log = fun s -> log#info "%s" s) ?max_length ?length content_type =
     content = Atomic.make (make_content ?length content_type);
   }
 
+let log { log } = log
 let get_field gen field = Frame_base.Fields.find field (Atomic.get gen.content)
 
 let set_field =
@@ -134,12 +136,24 @@ let get_track_marks gen =
 
 let _add_track_mark ?pos gen =
   let pos = default_pos gen pos in
+  gen.log
+    (Printf.sprintf
+       "Adding track mark at pos: %d in generator. Generator length: %d, \
+        buffered length: %d"
+       pos (length gen) (buffered_length gen));
   _set_track_marks gen (pos :: get_track_marks gen)
 
 let add_track_mark ?pos gen =
   Tutils.mutexify gen.lock (fun () -> _add_track_mark ?pos gen) ()
 
 let _put gen field new_content =
+  gen.log
+    (Printf.sprintf
+       "Putting %d tick of %s content in generator. Generator length: %d, \
+        buffered length: %d"
+       (Content.length new_content)
+       (Frame_base.Fields.string_of_field field)
+       (length gen) (buffered_length gen));
   (match field with
     | f when f = Frame_base.Fields.track_marks ->
         List.iter
@@ -262,6 +276,12 @@ let fill gen =
 
           let gen_content = Atomic.get gen.content in
           let frame_content = Atomic.get frame.content in
+
+          gen.log
+            (Printf.sprintf
+               "Filling frame from. Frame length: %d, frame position: %d, gen \
+                length: %d, available: %d"
+               (length frame) pos (length gen) available);
 
           Atomic.set gen.content
             (Frame_base.Fields.mapi

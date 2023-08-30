@@ -536,6 +536,10 @@ let mk_decoder ~filename ~close ~remaining ~buffer decoder =
   { fill; fseek; close }
 
 let file_decoder ~filename ~close ~remaining ~ctype decoder =
+  let log = Log.make ["decoder"; Filename.basename filename] in
+  log#important "Creating decoder for file %s and type: %s"
+    (Lang_string.escape_utf8_string filename)
+    (Frame.string_of_content_type ctype);
   let generator = Generator.create ~log:(log#info "%s") ctype in
   let buffer = mk_buffer ~ctype generator in
   mk_decoder ~filename ~close ~remaining ~buffer decoder
